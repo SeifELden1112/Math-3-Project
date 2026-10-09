@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Battery Charging Lab</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#eef3f1;--panel:#fbfdfc;--ink:#12263a;--mute:#5d7184;--line:#c9d6d2;--grid:#dbe6e2;--ex:#12263a;--eu:#d1495b;--he:#c98a00;--rk:#00798c;--ok:#1f9d6b;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1b24;--panel:#16262f;--ink:#e3eeec;--mute:#8da4b0;--line:#2a3f4a;--grid:#1f323c;--ex:#e3eeec;--eu:#ff7a8a;--he:#f0b429;--rk:#3cc4d8;--ok:#3ddc97}}
+:root[data-theme="dark"]{--bg:#0f1b24;--panel:#16262f;--ink:#e3eeec;--mute:#8da4b0;--line:#2a3f4a;--grid:#1f323c;--ex:#e3eeec;--eu:#ff7a8a;--he:#f0b429;--rk:#3cc4d8;--ok:#3ddc97}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:26px;margin:0 0 2px;letter-spacing:-.01em}
+.sub{color:var(--mute);margin:0 0 18px}
+.grid{display:grid;grid-template-columns:300px 1fr;gap:16px}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.ctl{margin-bottom:12px}.ctl label{display:flex;justify-content:space-between;font-weight:600;font-size:14px}
+.ctl output{font:500 14px "IBM Plex Mono",monospace;color:var(--rk)}
+input[type=range]{width:100%;accent-color:var(--rk)}
+select{width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+.battery{display:flex;align-items:center;gap:16px;margin-bottom:14px}
+.stats{font:500 13px/1.7 "IBM Plex Mono",monospace;color:var(--mute)}.stats b{color:var(--ink)}
+.chk{display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0 0}.chk label{display:flex;align-items:center;gap:5px;font-weight:400;font-size:14px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:12px;flex-wrap:wrap}
+.tabs button{border:0;background:none;color:var(--mute);padding:8px 14px;font:600 14px "IBM Plex Sans",sans-serif;cursor:pointer;border-bottom:3px solid transparent}
+.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--rk)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--rk);outline-offset:2px}
+canvas{width:100%;height:380px;display:block}
+.tbl{overflow-x:auto}table{border-collapse:collapse;width:100%;font:400 12.5px "IBM Plex Mono",monospace}
+th,td{padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}th{color:var(--mute);font-weight:500}
+.note{color:var(--mute);font-size:13px;margin:10px 0 0}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;margin-top:8px}.legend i{display:inline-block;width:18px;height:3px;margin-right:6px;vertical-align:middle}
+.theme{float:right;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:5px 10px;cursor:pointer;font:inherit;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<button class="theme" id="theme">Toggle theme</button>
+<h1>Battery Charging Lab</h1>
+<p class="sub">Math 3, Project 3: dV/dt = (Vs − V)/(RC), solved by Euler, Heun and RK4 and compared with the exact solution.</p>
+<div class="grid">
+<aside class="panel">
+<div class="battery">
+<svg width="92" height="150" viewBox="0 0 92 150" aria-label="Battery charge level">
+<rect x="30" y="2" width="32" height="10" rx="2" fill="var(--mute)"/>
+<rect x="6" y="12" width="80" height="134" rx="10" fill="none" stroke="var(--ink)" stroke-width="4"/>
+<rect id="fill" x="12" y="140" width="68" height="0" rx="5" fill="var(--ok)"/>
+<text id="pct" x="46" y="84" text-anchor="middle" font-family="IBM Plex Mono" font-weight="500" font-size="18" fill="var(--ink)">0%</text>
+</svg>
+<div class="stats" id="stats"></div>
+</div>
+<div class="ctl"><label for="t">Time t <output id="o_t"></output></label><input id="t" type="range" min="0" max="20" step="0.1" value="0"></div>
+<hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+<div class="ctl"><label for="Vs">Source Vs (V) <output id="o_Vs"></output></label><input id="Vs" type="range" min="1" max="12" step="0.5" value="5"></div>
+<div class="ctl"><label for="R">Resistance R (Ω) <output id="o_R"></output></label><input id="R" type="range" min="1" max="50" step="1" value="10"></div>
+<div class="ctl"><label for="C">Capacitance C (F) <output id="o_C"></output></label><input id="C" type="range" min="0.1" max="2" step="0.05" value="0.5"></div>
+<div class="ctl"><label for="V0">Initial V0 (V) <output id="o_V0"></output></label><input id="V0" type="range" min="0" max="5" step="0.5" value="0"></div>
+<div class="ctl"><label for="T">End time T (s) <output id="o_T"></output></label><input id="T" type="range" min="5" max="60" step="5" value="20"></div>
+<div class="ctl"><label for="h">Step size h (s)</label>
+<select id="h"><option>4</option><option selected>2</option><option>1</option><option>0.5</option><option>0.25</option><option>0.1</option></select></div>
+<div class="ctl"><label>Methods shown</label><div class="chk">
+<label><input type="checkbox" id="m_euler" checked>Euler</label><label><input type="checkbox" id="m_heun" checked>Heun</label><label><input type="checkbox" id="m_rk4" checked>RK4</label></div></div>
+</aside>
+<main class="panel">
+<div class="tabs" role="tablist">
+<button role="tab" data-tab="volt" aria-selected="true">Voltage curve</button>
+<button role="tab" data-tab="steps" aria-selected="false">Step by step</button>
+<button role="tab" data-tab="err" aria-selected="false">Error vs step size</button>
+<button role="tab" data-tab="rc" aria-selected="false">Effect of R and C</button>
+</div>
+<section id="tab-volt"><canvas id="c1"></canvas><div class="legend" id="lg1"></div>
+<p class="note">Drag the Time slider to move the marker and fill the battery.</p></section>
+<section id="tab-steps" hidden>
+<div class="ctl" style="max-width:240px"><label for="sm">Method</label><select id="sm"><option value="euler">Euler</option><option value="heun">Heun</option><option value="rk4">RK4</option></select></div>
+<div class="tbl"><table id="tbl"></table></div></section>
+<section id="tab-err" hidden><canvas id="c2"></canvas><div class="legend" id="lg2"></div>
+<p class="note">Slopes on the log-log plot match the method orders: 1 for Euler, 2 for Heun, 4 for RK4.</p></section>
+<section id="tab-rc" hidden><canvas id="c3"></canvas><div class="legend" id="lg3"></div>
+<p class="note">Curves with the same τ = RC overlap. The battery reaches 95% of Vs at about 3τ.</p></section>
+</main>
+</div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const P=()=>({Vs:+$('Vs').value,R:+$('R').value,C:+$('C').value,V0:+$('V0').value,T:+$('T').value,h:+$('h').value});
+const f=(V,p)=>(p.Vs-V)/(p.R*p.C);
+const exact=(t,p)=>p.Vs-(p.Vs-p.V0)*Math.exp(-t/(p.R*p.C));
+const M={
+ euler:{name:'Euler',col:'--eu',order:1,cols:['k1'],step:(V,h,p)=>{const k1=f(V,p);return{ks:[k1],V:V+h*k1}}},
+ heun:{name:'Heun',col:'--he',order:2,cols:['k1','k2'],step:(V,h,p)=>{const k1=f(V,p),k2=f(V+h*k1,p);return{ks:[k1,k2],V:V+h/2*(k1+k2)}}},
+ rk4:{name:'RK4',col:'--rk',order:4,cols:['k1','k2','k3','k4'],step:(V,h,p)=>{const k1=f(V,p),k2=f(V+h/2*k1,p),k3=f(V+h/2*k2,p),k4=f(V+h*k3,p);return{ks:[k1,k2,k3,k4],V:V+h/6*(k1+2*k2+2*k3+k4)}}}
+};
+function run(m,h,p){const n=Math.round(p.T/h),rows=[];let V=p.V0;
+ for(let i=0;i<n;i++){const t=i*h,s=M[m].step(V,h,p),ex=exact(t+h,p);rows.push({n:i,t,V,ks:s.ks,V1:s.V,ex,err:Math.abs(ex-s.V)});V=s.V}
+ return rows}
+function series(m,h,p){const r=run(m,h,p);return{x:[0,...r.map(a=>a.t+h)],y:[p.V0,...r.map(a=>a.V1)]}}
+function setup(c){const d=devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;c.width=w*d;c.height=h*d;const g=c.getContext('2d');g.setTransform(d,0,0,d,0,0);return{g,w,h}}
+function chart(c,S,o){
+ const{g,w,h}=setup(c),L=58,Rr=16,Tp=14,B=44,pw=w-L-Rr,ph=h-Tp-B;
+ const all=S.flatMap(s=>s.x.map((x,i)=>[x,s.y[i]])).filter(a=>a[1]>0||!o.ylog);
+ let x0=o.x0??Math.min(...all.map(a=>a[0])),x1=o.x1??Math.max(...all.map(a=>a[0]));
+ let y0=o.y0??Math.min(...all.map(a=>a[1])),y1=o.y1??Math.max(...all.map(a=>a[1]));
+ const tx=v=>o.xlog?Math.log10(v):v,ty=v=>o.ylog?Math.log10(v):v;
+ let X0=tx(x0),X1=tx(x1),Y0=ty(y0),Y1=ty(y1);
+ if(o.ylog){Y0=Math.floor(Y0);Y1=Math.ceil(Y1)}
+ const px=v=>L+(tx(v)-X0)/(X1-X0)*pw,py=v=>Tp+ph-(ty(v)-Y0)/(Y1-Y0)*ph;
+ g.font='12px IBM Plex Mono,monospace';g.fillStyle=css('--mute');g.strokeStyle=css('--grid');g.lineWidth=1;
+ for(let i=0;i<=5;i++){let yv=Y0+(Y1-Y0)*i/5,y=Tp+ph-ph*i/5;g.beginPath();g.moveTo(L,y);g.lineTo(L+pw,y);g.stroke();
+  g.textAlign='right';g.fillText(o.ylog?'1e'+Math.round(yv):yv.toFixed(1),L-6,y+4)}
+ const xt=o.xticks||[0,1,2,3,4,5].map(i=>x0+(x1-x0)*i/5);
+ xt.forEach(v=>{const x=px(v);g.beginPath();g.moveTo(x,Tp);g.lineTo(x,Tp+ph);g.stroke();g.textAlign='center';g.fillText(+v.toPrecision(3),x,Tp+ph+16)});
+ g.fillStyle=css('--ink');g.textAlign='center';g.fillText(o.xl,L+pw/2,h-6);
+ g.save();g.translate(14,Tp+ph/2);g.rotate(-Math.PI/2);g.fillText(o.yl,0,0);g.restore();
+ S.forEach(s=>{g.strokeStyle=s.col;g.fillStyle=s.col;g.lineWidth=s.lw||2;g.setLineDash(s.dash||[]);g.beginPath();
+  s.x.forEach((x,i)=>{const X=px(x),Y=py(s.y[i]);i?g.lineTo(X,Y):g.moveTo(X,Y)});g.stroke();g.setLineDash([]);
+  if(s.dots&&s.x.length<60)s.x.forEach((x,i)=>{g.beginPath();g.arc(px(x),py(s.y[i]),3.5,0,7);g.fill()})});
+ if(o.vline!=null){g.strokeStyle=css('--ink');g.setLineDash([4,4]);g.lineWidth=1;const x=px(o.vline);g.beginPath();g.moveTo(x,Tp);g.lineTo(x,Tp+ph);g.stroke();g.setLineDash([])}
+}
+function legend(id,S){$(id).innerHTML=S.map(s=>`<span><i style="background:${s.col}"></i>${s.name}</span>`).join('')}
+function update(){
+ const p=P();$('t').max=p.T;if(+$('t').value>p.T)$('t').value=p.T;const tv=+$('t').value;
+ ['Vs','R','C','V0','T'].forEach(k=>$('o_'+k).textContent=p[k]);$('o_t').textContent=tv.toFixed(1)+' s';
+ const tau=p.R*p.C,V=exact(tv,p),soc=Math.max(0,Math.min(1,V/p.Vs));
+ $('fill').setAttribute('height',134*0.97*soc);$('fill').setAttribute('y',140-134*0.97*soc+0);$('pct').textContent=Math.round(soc*100)+'%';
+ $('stats').innerHTML=`τ = RC = <b>${tau.toFixed(2)} s</b><br>t(95%) = <b>${(3*tau).toFixed(2)} s</b><br>V(t) = <b>${V.toFixed(3)} V</b>`;
+ // chart 1
+ const xs=[];for(let i=0;i<=300;i++)xs.push(p.T*i/300);
+ const S=[{name:'Exact',col:css('--ex'),x:xs,y:xs.map(t=>exact(t,p)),lw:2.5}];
+ for(const m in M)if($('m_'+m).checked){const s=series(m,p.h,p);S.push({name:M[m].name+' (h='+p.h+')',col:css(M[m].col),x:s.x,y:s.y,dash:[6,4],dots:true,lw:1.8})}
+ const lo=Math.min(p.V0,p.Vs),hi=Math.max(p.V0,p.Vs);
+ if($('tab-volt').hidden===false){chart($('c1'),S,{xl:'t (s)',yl:'V (volt)',x0:0,x1:p.T,y0:lo,y1:hi,vline:tv});legend('lg1',S)}
+ if($('tab-steps').hidden===false)table(p);
+ if($('tab-err').hidden===false)errChart(p);
+ if($('tab-rc').hidden===false)rcChart(p);
+}
+function table(p){const m=$('sm').value,r=run(m,p.h,p),ks=M[m].cols;
+ $('tbl').innerHTML='<tr><th>n</th><th>t_n</th><th>V_n</th>'+ks.map(k=>`<th>${k}</th>`).join('')+'<th>V_n+1</th><th>exact</th><th>|error|</th></tr>'+
+ r.map(a=>`<tr><td>${a.n}</td><td>${a.t.toFixed(2)}</td><td>${a.V.toFixed(5)}</td>${a.ks.map(k=>`<td>${k.toFixed(5)}</td>`).join('')}<td>${a.V1.toFixed(5)}</td><td>${a.ex.toFixed(5)}</td><td>${a.err.toExponential(2)}</td></tr>`).join('')}
+function errChart(p){const hs=[4,2,1,.5,.25,.125,.0625],S=[],names=[];
+ for(const m in M){const e=hs.map(h=>{const r=run(m,h,p);return Math.max(1e-16,...r.map(a=>a.err))});
+  const q=Math.log2(e[e.length-2]/e[e.length-1]);S.push({name:`${M[m].name}, observed order ≈ ${q.toFixed(2)}`,col:css(M[m].col),x:hs,y:e,dots:true})}
+ chart($('c2'),S,{xl:'step size h (s)',yl:'max |error| (V)',xlog:true,ylog:true,xticks:[0.0625,0.125,0.25,0.5,1,2,4]});legend('lg2',S)}
+function rcChart(p){const cs=[[5,.5],[10,.5],[20,.5],[10,1],[10,.25]],cols=['--eu','--he','--rk','--ok','--mute'],S=cs.map(([R,C],i)=>{
+  const q={...p,R,C},r=series('rk4',0.1,q);return{name:`R=${R}, C=${C} (τ=${R*C})`,col:css(cols[i]),x:r.x,y:r.y,dash:i==3?[6,4]:[],lw:2}});
+ chart($('c3'),S,{xl:'t (s)',yl:'V (volt)',x0:0,x1:p.T,y0:Math.min(p.V0,p.Vs),y1:Math.max(p.V0,p.Vs)});legend('lg3',S)}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));
+ ['volt','steps','err','rc'].forEach(k=>$('tab-'+k).hidden=k!==b.dataset.tab);update()});
+document.querySelectorAll('input,select').forEach(e=>e.addEventListener('input',update));
+$('theme').onclick=()=>{const d=document.documentElement,dark=css('--bg')==='#0f1b24';d.setAttribute('data-theme',dark?'light':'dark');update()};
+addEventListener('resize',update);
+update();
+</script>
+</body>
+</html>
